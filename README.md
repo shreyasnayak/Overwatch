@@ -3,12 +3,18 @@
 
 *Real-time facial verification and automated workstation locking upon intruder detection.*
 
-[![Download Build](https://img.shields.io/badge/Download-Pre--Compiled%20Executable-blue?style=for-the-badge&logo=google-drive)](https://drive.google.com/file/d/12E9jjk4cFZT3LHQutu7Xpt8-FEtTYtYq/view?usp=drive_link)
-
-
 ![Overwatch Live Demo](Demo/demo.gif)
 
 ---
+
+# Download Pre-Compiled Binary (Quick Launch)
+1. Ensure the **[Visual Studio 2022 C++ Redistributable (x64)](https://aka.ms/vs/17/release/vc_redist.x64.exe)** runtime is installed.
+2. Download the standalone binary package
+
+   [![Download Build](https://img.shields.io/badge/Download-Pre--Compiled%20Executable-blue?style=for-the-badge&logo=google-drive)](https://drive.google.com/file/d/12E9jjk4cFZT3LHQutu7Xpt8-FEtTYtYq/view?usp=drive_link)
+
+3. Extract the archive, replace `my_face.jpg` with a photo of your face, and run `Overwatch.exe`.
+
 
 ## Overview
 
