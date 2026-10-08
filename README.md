@@ -3,6 +3,9 @@
 
 *Real-time facial verification and automated workstation locking upon intruder detection.*
 
+[![Download Build](https://img.shields.io/badge/Download-Pre--Compiled%20Executable-blue?style=for-the-badge&logo=google-drive)](https://drive.google.com/file/d/12E9jjk4cFZT3LHQutu7Xpt8-FEtTYtYq/view?usp=drive_link)
+
+
 ![Overwatch Live Demo](Demo/demo.gif)
 
 ---
