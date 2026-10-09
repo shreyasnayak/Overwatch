@@ -79,6 +79,7 @@ void PrivacyThread::run()
             detector->detect(frame, faces);
 
             bool ownerDetected = false;
+            bool intruderDetected = false;
 
             for (int i = 0; i < faces.rows; i++) {
                 cv::Mat alignedFace, feature;
@@ -99,6 +100,7 @@ void PrivacyThread::run()
                     cv::putText(frame, "AUTHORIZED", cv::Point(x, y - 10),
                                 cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 0), 2);
                 } else {
+                    intruderDetected = true; // <-- Flags any unauthorized face in frame
                     cv::rectangle(frame, cv::Rect(x, y, w, h), cv::Scalar(0, 0, 255), 2); // Red
                     cv::putText(frame, "UNAUTHORIZED", cv::Point(x, y - 10),
                                 cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255), 2);
@@ -106,22 +108,30 @@ void PrivacyThread::run()
             }
 
             // -----------------------------------------------------------------
-            // Lock Grace Period & Timer Logic
+            // Strict Privacy Condition:
+            // Safe ONLY IF owner is present AND no intruder is looking over shoulder
             // -----------------------------------------------------------------
-            if (ownerDetected) {
-                // If owner returns during countdown, cancel the lock process
+            bool isSafe = ownerDetected && !intruderDetected;
+
+            if (isSafe) {
+                // Owner is alone at the workstation -> Reset/cancel any active countdown
                 if (countdownActive) {
                     countdownActive = false;
                     lastEmittedSecond = -1;
                     emit statusUpdate("System Active - Authorized User Verified");
                 }
             } else {
-                // Owner is NOT detected (either intruder present or user stepped away)
+                // Unsafe condition: either an intruder is present OR no user is in front of camera
                 if (!countdownActive) {
                     countdownActive = true;
                     graceTimer.start();
                     lastEmittedSecond = GRACE_PERIOD_SECONDS;
-                    emit statusUpdate(QString("WARNING: Unauthorized/No User! Locking in %1s...").arg(GRACE_PERIOD_SECONDS));
+
+                    if (intruderDetected) {
+                        emit statusUpdate(QString("ALERT: Unauthorized Person Detected! Locking in %1s...").arg(GRACE_PERIOD_SECONDS));
+                    } else {
+                        emit statusUpdate(QString("WARNING: No User Detected! Locking in %1s...").arg(GRACE_PERIOD_SECONDS));
+                    }
                 }
 
                 qint64 elapsedMs = graceTimer.elapsed();
@@ -130,20 +140,25 @@ void PrivacyThread::run()
                 if (remainingSec > 0) {
                     if (remainingSec != lastEmittedSecond) {
                         lastEmittedSecond = remainingSec;
-                        emit statusUpdate(QString("WARNING: Locking workstation in %1 seconds...").arg(remainingSec));
+                        if (intruderDetected) {
+                            emit statusUpdate(QString("ALERT: Unauthorized person present! Locking in %1s...").arg(remainingSec));
+                        } else {
+                            emit statusUpdate(QString("WARNING: Locking workstation in %1s...").arg(remainingSec));
+                        }
                     }
 
-                    // Render large visual timer banner directly on video frame
-                    std::string timerText = "WARNING: LOCKING IN " + std::to_string(remainingSec) + "s";
-                    cv::putText(frame, timerText, cv::Point(30, 50),
-                                cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255), 3);
+                    // Render prominent visual warning banner on top of the webcam feed
+                    std::string alertBanner = intruderDetected ? "INTRUDER DETECTED! LOCKING IN " + std::to_string(remainingSec) + "s"
+                                                               : "NO USER PRESENT! LOCKING IN " + std::to_string(remainingSec) + "s";
+
+                    cv::putText(frame, alertBanner, cv::Point(20, 50),
+                                cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255), 2);
                 } else {
-                    // 5-second grace period expired without authorized verification -> Lock Workstation
-                    emit statusUpdate("INTRUDER CONFIRMED: Locking Workstation NOW!");
-                    cv::putText(frame, "LOCKING WORKSTATION...", cv::Point(30, 50),
+                    // Grace period elapsed without clearing the room -> Lock workstation
+                    emit statusUpdate("SECURITY BREACH: Locking Workstation NOW!");
+                    cv::putText(frame, "LOCKING WORKSTATION...", cv::Point(20, 50),
                                 cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255), 3);
 
-                    // Send final frame with banner before locking
                     QImage qimg(frame.data, frame.cols, frame.rows, frame.step, QImage::Format_BGR888);
                     emit frameReady(qimg.copy());
 
@@ -152,7 +167,6 @@ void PrivacyThread::run()
                     countdownActive = false;
                     lastEmittedSecond = -1;
 
-                    // Pause thread briefly so it doesn't re-trigger immediately upon Windows unlock
                     QThread::sleep(5);
                     emit statusUpdate("System Active - Monitoring");
                     continue;
@@ -162,6 +176,8 @@ void PrivacyThread::run()
             QImage qimg(frame.data, frame.cols, frame.rows, frame.step, QImage::Format_BGR888);
             emit frameReady(qimg.copy());
         }
+
+
         cap.release();
     } catch (const std::exception& e) {
         emit statusUpdate(QString("OpenCV Exception: ") + e.what());
